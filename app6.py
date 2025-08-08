@@ -25,9 +25,9 @@ st.set_page_config(page_title="Desi Meme Creator", page_icon="😂")
 # App title and subheader
 st.title("Desi Meme Creator")
 try:
-    st.subheader("Upload an image and enter text to create a meme. The text's language will be detected and stored in a database.")
+    st.subheader("Select a predefined image or upload your own, then enter text to create a meme. The text's language will be detected and stored in a database.")
 except AttributeError:
-    st.markdown("## Upload an image and enter text to create a meme. The text's language will be detected and stored in a database.")
+    st.markdown("## Select a predefined image or upload your own, then enter text to create a meme. The text's language will be detected and stored in a database.")
 
 # Language code to name mapping
 language_map = {
@@ -131,9 +131,13 @@ def draw_text_with_outline(draw, text, x, y, font, fill_color="white", outline_c
         st.stop()
 
 # Function to create meme
-def create_meme(image, text, font_size, language_name):
+def create_meme(image_input, text, font_size, language_name):
     try:
-        img = Image.open(image)
+        # Handle both file path (predefined) and file object (uploaded)
+        if isinstance(image_input, str):
+            img = Image.open(image_input)
+        else:
+            img = Image.open(image_input)
         if img.mode == 'RGBA':
             img = img.convert('RGB')
         draw = ImageDraw.Draw(img)
@@ -204,8 +208,55 @@ def get_corpus():
         st.error(f"Error retrieving corpus: {str(e)}")
         return pd.DataFrame()
 
-# File uploader
-uploaded_image = st.file_uploader("Upload a meme image (JPG/PNG)", type=["jpg", "jpeg", "png"])
+# Image input selection
+image_input_option = st.radio("Choose Image Input", ("Select Predefined Image", "Upload Custom Image"))
+
+# Predefined images for selection
+image_options = {
+    "Meme 1": "images/meme1.jpg",
+    "Meme 2": "images/meme2.jpg",
+    "Meme 3": "images/meme3.jpg",
+    "Meme 4": "images/meme4.jpg",
+    "Meme 5": "images/meme5.jpg",
+    "Meme 6": "images/meme6.jpg",
+    "Meme 7": "images/meme7.jpg",
+    "Meme 8": "images/meme8.jpg",
+    "Meme 9": "images/meme9.jpg",
+    "Meme 10": "images/meme10.jpg"
+}
+
+selected_image = None
+
+if image_input_option == "Select Predefined Image":
+    st.subheader("Select a Meme Image")
+    # First row
+    cols1 = st.columns(5)  # 5 columns for first row
+    for idx, (img_name, img_path) in enumerate(list(image_options.items())[:5]):
+        try:
+            with cols1[idx]:
+                img = Image.open(img_path)
+                st.image(img, caption=img_name, use_column_width=True)
+                if st.button(f"Select {img_name}", key=f"select_{img_name}"):
+                    selected_image = img_path
+        except Exception as e:
+            st.warning(f"Error loading image {img_name}: {str(e)}")
+
+    # Second row
+    cols2 = st.columns(5)  # 5 columns for second row
+    for idx, (img_name, img_path) in enumerate(list(image_options.items())[5:]):
+        try:
+            with cols2[idx]:
+                img = Image.open(img_path)
+                st.image(img, caption=img_name, use_column_width=True)
+                if st.button(f"Select {img_name}", key=f"select_{img_name}"):
+                    selected_image = img_path
+        except Exception as e:
+            st.warning(f"Error loading image {img_name}: {str(e)}")
+else:
+    st.subheader("Upload Your Image")
+    uploaded_image = st.file_uploader("Upload a meme image (JPG/PNG)", type=["jpg", "jpeg", "png"])
+    if uploaded_image:
+        selected_image = uploaded_image
 
 # Text input
 meme_text = st.text_input("Meme Caption (in any Indian language or English)", placeholder="e.g., मजेदार मीम, நகைச்சுவை")
@@ -215,10 +266,10 @@ font_size = st.slider("Font Size", 20, 100, 50)
 
 # Generate meme button
 if st.button("Generate Meme"):
-    if uploaded_image is not None and meme_text:
+    if selected_image is not None and meme_text:
         with st.spinner("Creating meme and detecting language..."):
             language_name = detect_language(meme_text)
-            meme_image = create_meme(uploaded_image, meme_text, font_size, language_name)
+            meme_image = create_meme(selected_image, meme_text, font_size, language_name)
             if meme_image:
                 try:
                     st.subheader("Generated Meme")
@@ -241,7 +292,7 @@ if st.button("Generate Meme"):
 
             save_to_db(language_name, meme_text)
     else:
-        st.error("Please upload an image and enter a caption to generate a meme.")
+        st.error("Please select or upload an image and enter a caption to generate a meme.")
 
 # Display corpus
 df = get_corpus()
