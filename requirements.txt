@@ -4,3 +4,4 @@ langdetect
 Pillow
 psycopg2-binary
 requests
+langid
