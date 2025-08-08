@@ -208,6 +208,10 @@ def get_corpus():
         st.error(f"Error retrieving corpus: {str(e)}")
         return pd.DataFrame()
 
+# Initialize session state for selected image
+if 'selected_image' not in st.session_state:
+    st.session_state.selected_image = None
+
 # Image input selection
 image_input_option = st.radio("Choose Image Input", ("Select Predefined Image", "Upload Custom Image"))
 
@@ -225,8 +229,6 @@ image_options = {
     "Meme 10": "images/meme10.jpg"
 }
 
-selected_image = None
-
 if image_input_option == "Select Predefined Image":
     st.subheader("Select a Meme Image")
     # First row
@@ -235,9 +237,9 @@ if image_input_option == "Select Predefined Image":
         try:
             with cols1[idx]:
                 img = Image.open(img_path)
-                st.image(img, caption=img_name, use_column_width=True)
+                st.image(img, caption=img_name, use_container_width=True)
                 if st.button(f"Select {img_name}", key=f"select_{img_name}"):
-                    selected_image = img_path
+                    st.session_state.selected_image = img_path
         except Exception as e:
             st.warning(f"Error loading image {img_name}: {str(e)}")
 
@@ -247,16 +249,16 @@ if image_input_option == "Select Predefined Image":
         try:
             with cols2[idx]:
                 img = Image.open(img_path)
-                st.image(img, caption=img_name, use_column_width=True)
+                st.image(img, caption=img_name, use_container_width=True)
                 if st.button(f"Select {img_name}", key=f"select_{img_name}"):
-                    selected_image = img_path
+                    st.session_state.selected_image = img_path
         except Exception as e:
             st.warning(f"Error loading image {img_name}: {str(e)}")
 else:
     st.subheader("Upload Your Image")
     uploaded_image = st.file_uploader("Upload a meme image (JPG/PNG)", type=["jpg", "jpeg", "png"])
     if uploaded_image:
-        selected_image = uploaded_image
+        st.session_state.selected_image = uploaded_image
 
 # Text input
 meme_text = st.text_input("Meme Caption (in any Indian language or English)", placeholder="e.g., मजेदार मीम, நகைச்சுவை")
@@ -266,16 +268,16 @@ font_size = st.slider("Font Size", 20, 100, 50)
 
 # Generate meme button
 if st.button("Generate Meme"):
-    if selected_image is not None and meme_text:
+    if st.session_state.selected_image is not None and meme_text:
         with st.spinner("Creating meme and detecting language..."):
             language_name = detect_language(meme_text)
-            meme_image = create_meme(selected_image, meme_text, font_size, language_name)
+            meme_image = create_meme(st.session_state.selected_image, meme_text, font_size, language_name)
             if meme_image:
                 try:
                     st.subheader("Generated Meme")
                 except AttributeError:
                     st.markdown("## Generated Meme")
-                st.image(meme_image, caption="Your Meme", use_column_width=True)
+                st.image(meme_image, caption="Your Meme", use_container_width=True)
                 
                 st.download_button(
                     label="Download Meme",
