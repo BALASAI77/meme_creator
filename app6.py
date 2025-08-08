@@ -1,7 +1,7 @@
 import os
 import streamlit as st
 import pandas as pd
-from langdetect import detect, LangDetectException
+import langid
 from PIL import Image, ImageDraw, ImageFont
 import io
 import requests
@@ -169,11 +169,11 @@ def detect_language(text):
     try:
         if len(text.strip()) < 5:
             return "English"
-        lang_code = detect(text)
-        return language_map.get(lang_code, "Unknown")
-    except LangDetectException as e:
-        st.error(f"Error detecting language: {str(e)}")
-        return "Unknown"
+        lang_code, confidence = langid.classify(text)
+        # Only accept detection if confidence is positive or text is clearly in a supported script
+        if confidence > 0 or lang_code in language_map:
+            return language_map.get(lang_code, "Unknown")
+        return "English"  # Fallback for low-confidence detections
     except Exception as e:
         st.error(f"Error detecting language: {str(e)}")
         return "Unknown"
