@@ -208,9 +208,11 @@ def get_corpus():
         st.error(f"Error retrieving corpus: {str(e)}")
         return pd.DataFrame()
 
-# Initialize session state for selected image
+# Initialize session state for selected image and image name
 if 'selected_image' not in st.session_state:
     st.session_state.selected_image = None
+if 'selected_image_name' not in st.session_state:
+    st.session_state.selected_image_name = None
 
 # Image input selection
 image_input_option = st.radio("Choose Image Input", ("Select Predefined Image", "Upload Custom Image"))
@@ -240,6 +242,7 @@ if image_input_option == "Select Predefined Image":
                 st.image(img, caption=img_name, use_container_width=True)
                 if st.button(f"Select {img_name}", key=f"select_{img_name}"):
                     st.session_state.selected_image = img_path
+                    st.session_state.selected_image_name = img_name
         except Exception as e:
             st.warning(f"Error loading image {img_name}: {str(e)}")
 
@@ -252,13 +255,19 @@ if image_input_option == "Select Predefined Image":
                 st.image(img, caption=img_name, use_container_width=True)
                 if st.button(f"Select {img_name}", key=f"select_{img_name}"):
                     st.session_state.selected_image = img_path
+                    st.session_state.selected_image_name = img_name
         except Exception as e:
             st.warning(f"Error loading image {img_name}: {str(e)}")
+
+    # Display confirmation message if a predefined image is selected
+    if st.session_state.selected_image_name:
+        st.success(f"{st.session_state.selected_image_name} is selected")
 else:
     st.subheader("Upload Your Image")
     uploaded_image = st.file_uploader("Upload a meme image (JPG/PNG)", type=["jpg", "jpeg", "png"])
     if uploaded_image:
         st.session_state.selected_image = uploaded_image
+        st.session_state.selected_image_name = None  # Reset for uploaded images
 
 # Text input
 meme_text = st.text_input("Meme Caption (in any Indian language or English)", placeholder="e.g., मजेदार मीम, நகைச்சுவை")
