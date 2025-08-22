@@ -1,3 +1,4 @@
+
 import os
 import streamlit as st
 import pandas as pd
@@ -145,7 +146,7 @@ font_map = {
     'Unknown': 'NotoSans-Regular.ttf'
 }
 
-# Download fonts
+# Font URLs
 font_urls = {
     'NotoSansDevanagari-Regular.ttf': 'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf',
     'NotoSansTamil-Regular.ttf': 'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansTamil/NotoSansTamil-Regular.ttf',
@@ -161,10 +162,12 @@ font_urls = {
     'NotoSans-Regular.ttf': 'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf'
 }
 
+# Download fonts
 for font_file, url in font_urls.items():
     if not os.path.exists(font_file):
         try:
             response = requests.get(url)
+            response.raise_for_status()
             with open(font_file, "wb") as f:
                 f.write(response.content)
         except Exception as e:
@@ -207,6 +210,19 @@ def init_db():
         st.stop()
 
 init_db()
+
+# Function to clear database
+def clear_db():
+    try:
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
+        cursor.execute("TRUNCATE TABLE meme_corpus RESTART IDENTITY")
+        conn.commit()
+        cursor.close()
+        db_pool.putconn(conn)
+        st.success("Database cleared successfully!")
+    except Exception as e:
+        st.error(f"Error clearing database: {str(e)}")
 
 # Function to add text with outline
 def draw_text_with_outline(draw, text, x, y, font, fill_color="white", outline_color="black"):
@@ -293,7 +309,7 @@ def get_corpus():
         st.error(f"Error retrieving corpus: {str(e)}")
         return pd.DataFrame()
 
-# Initialize session state for selected image and image name
+# Initialize session state
 if 'selected_image' not in st.session_state:
     st.session_state.selected_image = None
 if 'selected_image_name' not in st.session_state:
@@ -304,10 +320,11 @@ with st.sidebar:
     st.header("Create Your Meme")
     st.markdown("---")
     
-    # Image input selection
-    image_input_option = st.radio("Choose Image Input", ("Select Predefined Image", "Upload Custom Image"))
+    # Image input selection with expander
+    with st.expander("Choose Image Input", expanded=True):
+        image_input_option = st.radio("Select Input Method", ("Predefined Image", "Upload Image"), help="Choose a predefined meme or upload your own.")
 
-    # Predefined images for selection
+    # Predefined images
     image_options = {
         "Meme 1": "images/meme1.jpg",
         "Meme 2": "images/meme2.jpg",
@@ -321,95 +338,215 @@ with st.sidebar:
         "Meme 10": "images/meme10.jpg"
     }
 
-    if image_input_option == "Select Predefined Image":
-        st.subheader("Select a Meme Image")
-        # Display images in a grid with custom styling
-        cols = st.columns(2)  # Adjusted to 2 columns for better sidebar fit
-        for idx, (img_name, img_path) in enumerate(image_options.items()):
-            with cols[idx % 2]:
-                try:
-                    img = Image.open(img_path)
-                    st.markdown(f'<div class="image-card">', unsafe_allow_html=True)
-                    st.image(img, caption=img_name, use_container_width=True)
-                    if st.button(f"Select {img_name}", key=f"select_{img_name}"):
-                        st.session_state.selected_image = img_path
-                        st.session_state.selected_image_name = img_name
-                    st.markdown('</div>', unsafe_allow_html=True)
-                except Exception as e:
-                    st.warning(f"Error loading image {img_name}: {str(e)}")
-
-        # Display confirmation message if a predefined image is selected
-        if st.session_state.selected_image_name:
-            st.success(f"{st.session_state.selected_image_name} is selected")
+    if image_input_option == "Predefined Image":
+        with st.expander("Select a Meme Image", expanded=True):
+            st.markdown('<div class="image-grid">', unsafe_allow_html=True)
+            cols = st.columns(2)
+            for idx, (img_name, img_path) in enumerate(image_options.items()):
+                with cols[idx % 2]:
+                    try:
+                        img = Image.open(img_path)
+                        st.markdown(f'<div class="image-card">', unsafe_allow_html=True)
+                        st.image(img, caption=img_name, use_container_width=True)
+                        if st.button(f"Select {img_name}", key=f"select_{img_name}"):
+                            st.session_state.selected_image = img_path
+                            st.session_state.selected_image_name = img_name
+                            st.success(f"{img_name} is selected")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                    except Exception as e:
+                        st.warning(f"Error loading image {img_name}: {str(e)}")
+            st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.subheader("Upload Your Image")
-        uploaded_image = st.file_uploader("Upload a meme image (JPG/PNG)", type=["jpg", "jpeg", "png"])
-        if uploaded_image:
-            st.session_state.selected_image = uploaded_image
-            st.session_state.selected_image_name = None  # Reset for uploaded images
-            st.success("Image uploaded successfully!")
+        with st.expander("Upload Your Image", expanded=True):
+            uploaded_image = st.file_uploader("Upload a meme image (JPG/PNG)", type=["jpg", "jpeg", "png"], help="Upload a JPG or PNG image for your meme.")
+            if uploaded_image:
+                st.session_state.selected_image = uploaded_image
+                st.session_state.selected_image_name = None
+                st.success("Image uploaded successfully!")
 
-    # Text input
-    meme_text = st.text_input("Meme Caption (in any Indian language or English)", placeholder="e.g., मजेदार मीम, நகைச்சுவை")
-
-    # Font size slider
-    font_size = st.slider("Font Size", 20, 100, 50)
+    # Text input and font size
+    with st.expander("Customize Caption", expanded=True):
+        meme_text = st.text_input("Meme Caption", placeholder="e.g., मजेदार मीम, நகைச்சுவை", help="Enter a caption in any Indian language or English.")
+        font_size = st.slider("Font Size", 20, 100, 50, help="Adjust the size of the caption text.")
 
     # Generate meme button
-    if st.button("Generate Meme"):
+    if st.button("Generate Meme", use_container_width=True):
         if st.session_state.selected_image is not None and meme_text:
             with st.spinner("Creating meme and detecting language..."):
                 language_name = detect_language(meme_text)
                 meme_image = create_meme(st.session_state.selected_image, meme_text, font_size, language_name)
                 if meme_image:
-                    try:
-                        st.subheader("Generated Meme")
-                    except AttributeError:
-                        st.markdown("## Generated Meme")
-                    st.image(meme_image, caption="Your Meme", use_container_width=True)
-                    
-                    st.download_button(
-                        label="Download Meme",
-                        data=meme_image,
-                        file_name="meme.png",
-                        mime="image/png"
-                    )
-                
-                    try:
-                        st.subheader("Detected Language")
-                    except AttributeError:
-                        st.markdown("## Detected Language")
-                    st.write(language_name)
-
+                    st.session_state.meme_image = meme_image
+                    st.session_state.language_name = language_name
                     save_to_db(language_name, meme_text)
         else:
-            st.error("Please select or upload an image and enter a caption to generate a meme.")
+            st.error("Please select or upload an image and enter a caption.")
 
-# Clear database button
-if st.button("Clear Database"):
-    clear_db()
+    # Admin controls
+    with st.expander("Admin Controls", expanded=False):
+        admin_password = st.text_input("Admin Password", type="password", help="Enter password to clear database.")
+        if st.button("Clear Database", use_container_width=True):
+            if admin_password == "your-secret-password":  # Replace with your actual password
+                clear_db()
+            else:
+                st.error("Incorrect password. Database not cleared.")
 
-# Display corpus
-df = get_corpus()
-if not df.empty:
-    try:
-        st.subheader("Current Corpus")
-    except AttributeError:
-        st.markdown("## Current Corpus")
-    st.dataframe(df)
-else:            
-    st.write("Corpus is empty.")
+# Main content area
+st.markdown("---")
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.header("Meme Preview")
+    if 'meme_image' in st.session_state and st.session_state.meme_image:
+        st.image(st.session_state.meme_image, caption="Your Meme", use_container_width=True)
+        st.download_button(
+            label="Download Meme",
+            data=st.session_state.meme_image,
+            file_name="meme.png",
+            mime="image/png",
+            use_container_width=True
+        )
+        if 'language_name' in st.session_state:
+            st.subheader("Detected Language")
+            st.write(st.session_state.language_name)
+    else:
+        st.info("Generate a meme to see the preview.")
+
+with col2:
+    st.header("Meme Corpus")
+    df = get_corpus()
+    if not df.empty:
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("Corpus is empty.")
 
 # Example inputs
-try:
-    st.subheader("Example Inputs")
-except AttributeError:
-    st.markdown("## Example Inputs")
-st.write("""
-- hiii (English)
-- मजेदार मीम (Hindi: Funny meme)
-- நகைச்சுவை (Tamil: Humor)
-- ମଜାରେ ମ୶ (Odia: Funny meme)
-- হাসিখুশি (Bengali: Happy)
-- తమాషా మీమ్ (Telugu: Funny meme)
-""")
+st.markdown("---")
+with st.expander("Example Inputs", expanded=False):
+    st.markdown("""
+    - hiii (English)
+    - मजेदार मीम (Hindi: Funny meme)
+    - நகைச்சுவை (Tamil: Humor)
+    - ମଜାରେ ମ୶ (Odia: Funny meme)
+    - হাসিখুশি (Bengali: Happy)
+    - తమాషా మీమ్ (Telugu: Funny meme)
+    """)
+
+'''
+### Fixes for the Syntax Error
+The error occurred because the file (`app6.py` or `app.py`) included Markdown code block markers (```python ... ```). The corrected code above:
+- Removes all Markdown markers, ensuring it’s pure Python.
+- Maintains the enhanced UI with expanders, a responsive image grid, and polished styling.
+- Includes a password-protected “Clear Database” button (replace `your-secret-password` with a secure value).
+
+### UI Enhancements
+1. **Expanders for Organization**:
+   - Image selection, upload, caption customization, and admin controls are grouped in `st.expander` sections for a cleaner sidebar.
+   - Expanders are collapsible to reduce clutter, with the image and caption sections open by default.
+2. **Image Selection**:
+   - Predefined images are displayed in a 2-column grid with card styling (shadows, rounded corners, hover scaling).
+   - Each image has a dedicated “Select” button with immediate success feedback.
+   - Images scale on hover (`transform: scale(1.05)`) for interactivity.
+3. **Input Components**:
+   - Text input and font size slider are styled with rounded borders and larger fonts.
+   - Help text (`help` parameter) guides users on each input.
+   - Buttons use full width (`use_container_width=True`) for consistency.
+4. **Main Layout**:
+   - Two-column layout: left for meme preview/download, right for corpus.
+   - Preview updates dynamically after generating a meme, stored in `st.session_state`.
+   - Corpus table is styled with borders and rounded corners.
+5. **Feedback and Styling**:
+   - Success/error messages have colored backgrounds and borders.
+   - Spinners use a custom color (`#4CAF50`) for consistency.
+   - Example inputs are in a collapsible expander to save space.
+
+### Deployment and Submission Steps
+To resolve the error and deploy the updated app with the enhanced UI:
+
+1. **Update app.py**:
+   - Save the code above as `app.py` (not `app6.py`) in your local `desi-meme-creator` directory.
+   - Replace `your-secret-password` with a secure password (store it safely, not in the code).
+   - Ensure `images/` contains `meme1.jpg` to `meme10.jpg` (<500KB each, optimized with [TinyPNG](https://tinypng.com/)).
+
+2. **Verify requirements.txt**:
+   - Ensure `requirements.txt` matches:
+     ```
+     streamlit>=0.65.0
+     pandas
+     langid
+     Pillow
+     psycopg2-binary
+     requests
+     ```
+   - If you previously used `langdetect`, update to `langid` by installing:
+     ```bash
+     pip install langid
+     ```
+
+3. **Commit and Push to Repositories**:
+   - Update your GitHub repo (`https://github.com/BALASAI77/desi-meme-creator`):
+     ```bash
+     cd desi-meme-creator
+     git add app.py requirements.txt
+     git commit -m "Fix syntax error and enhance UI for Render and code.swecha.org"
+     git push origin main
+     ```
+   - Push to `code.swecha.org`:
+     ```bash
+     git remote add swecha https://code.swecha.org/BalaSai/desi-meme-creator.git
+     git push swecha main
+     ```
+   - Verify files on `https://code.swecha.org/BalaSai/desi-meme-creator`:
+     - `app.py`, `requirements.txt`, `README.md`, `CONTRIBUTING.md`, `LICENSE`, `REPORT.md`, `images/`.
+     - Ensure the repository is public and `README.md` renders correctly.
+
+4. **Redeploy on Render**:
+   - Log in to [Render](https://dashboard.render.com/).
+   - Navigate to your app (`desi-meme-creator`).
+   - Trigger a manual redeploy or ensure it’s linked to your GitHub repo (`https://github.com/BALASAI77/desi-meme-creator`) for automatic deploys.
+   - Verify environment variables:
+     - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`.
+   - Test at `https://desi-meme-creator.onrender.com`:
+     - Select a predefined image (check “Meme X is selected”).
+     - Upload a custom JPG/PNG.
+     - Generate a meme (e.g., “మजेदार मीम”).
+     - Verify corpus updates and “Clear Database” (use your password).
+     - Check UI elements (expanders, image grid, styling).
+
+5. **Clear Database**:
+   - For a clean submission, clear the database:
+     - Use the “Clear Database” button in the app with your password.
+     - Or in pgAdmin:
+       ```sql
+       TRUNCATE TABLE meme_corpus RESTART IDENTITY;
+       ```
+     - Verify:
+       ```sql
+       SELECT * FROM meme_corpus;
+       ```
+       (Should return no rows.)
+
+6. **Submit to code.swecha.org**:
+   - Submit the repository URL: `https://code.swecha.org/BalaSai/desi-meme-creator`.
+   - Confirm it’s publicly accessible.
+
+### Notes
+- **Personalization**: Replace `[Your Name]` and `[your-email@example.com]` in `README.md`, `CONTRIBUTING.md`, `LICENSE`, and `REPORT.md` (from previous responses) with your details (e.g., `Bala Sai`, `bala.sai@example.com`). Share these if you want pre-filled files.
+- **Password Security**: Replace `your-secret-password` with a secure value. Avoid hardcoding; consider setting it as an environment variable on Render (`ADMIN_PASSWORD`).
+- **Image Optimization**: Ensure `meme1.jpg` to `meme10.jpg` are <500KB. Use a CDN if size is an issue:
+  ```python
+  image_options = {
+      "Meme 1": "https://your-cdn.com/meme1.jpg",
+      # ... up to "Meme 10"
+  }
+  ```
+- **Further UI Enhancements**: If you want features like text color selection, text positioning, or image filters, let me know.
+- **Dependencies**: The code uses `langid` (per your latest code). Ensure it’s installed on Render.
+
+### Troubleshooting
+- **Syntax Error Persists**: Verify `app.py` contains only the Python code above (no ```python markers). Check file encoding (UTF-8) and line endings (Unix-style, `\n`).
+- **Render Errors**: Check Render logs for issues (e.g., missing dependencies, database connection). Ensure `requirements.txt` is correct.
+- **Image Issues**: Confirm `images/` is in the repository and filenames match `image_options`. Use `git lfs` for large images.
+- **UI Rendering**: Test locally (`streamlit run app.py`) to verify styling. Ensure browser cache is cleared for Render.
+
+If you provide your name/email or encounter specific errors (e.g., Render logs), I can refine the files or troubleshoot further. Test the app and submit `https://code.swecha.org/BalaSai/desi-meme-creator` once verified!'''
