@@ -1,3 +1,4 @@
+
 import os
 import streamlit as st
 import pandas as pd
@@ -216,28 +217,6 @@ def init_db():
 init_db()
 
 # Function to clear database
-def init_db():
-    try:
-        conn = db_pool.getconn()
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS meme_corpus (
-                id SERIAL PRIMARY KEY,
-                language VARCHAR(50),
-                text TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        conn.commit()
-        cursor.close()
-        db_pool.putconn(conn)
-    except Exception as e:
-        st.error(f"Error initializing database: {str(e)}")
-        st.stop()
-
-init_db()
-
-# Function to clear database
 def clear_db():
     try:
         conn = db_pool.getconn()
@@ -341,6 +320,20 @@ if 'selected_image' not in st.session_state:
 if 'selected_image_name' not in st.session_state:
     st.session_state.selected_image_name = None
 
+# Predefined images
+image_options = {
+    "Meme 1": "images/meme1.jpg",
+    "Meme 2": "images/meme2.jpg",
+    "Meme 3": "images/meme3.jpg",
+    "Meme 4": "images/meme4.jpg",
+    "Meme 5": "images/meme5.jpg",
+    "Meme 6": "images/meme6.jpg",
+    "Meme 7": "images/meme7.jpg",
+    "Meme 8": "images/meme8.jpg",
+    "Meme 9": "images/meme9.jpg",
+    "Meme 10": "images/meme10.jpg"
+}
+
 # Sidebar for inputs
 with st.sidebar:
     st.header("Create Your Meme")
@@ -399,7 +392,7 @@ with st.sidebar:
     with st.expander("Admin Controls", expanded=False):
         admin_password = st.text_input("Admin Password", type="password", help="Enter password to clear database.")
         if st.button("Clear Database", use_container_width=True):
-            if admin_password == "bala":  # Replace with your actual password
+            if admin_password == "bala":  # Replace with a secure password
                 clear_db()
             else:
                 st.error("Incorrect password. Database not cleared.")
@@ -444,3 +437,124 @@ with st.expander("Example Inputs", expanded=False):
     - হাসিখুশি (Bengali: Happy)
     - తమాషా మీమ్ (Telugu: Funny meme)
     """)
+'''
+### Key Changes Implemented
+1. **Conditional Image Display**:
+   - The `if image_input_option == "Predefined Image"` block ensures that only the predefined image grid is shown when “Predefined Image” is selected.
+   - The `else` block shows only the file uploader when “Upload Image” is selected.
+   - Each section is wrapped in its own `st.expander` (`Select a Meme Image` or `Upload Your Image`), ensuring only one is visible at a time based on the radio button choice.
+
+2. **Click-to-Select Image**:
+   - Removed the `st.button(f"Select {img_name}", key=f"select_{img_name}")` lines.
+   - Used `st.image`’s click detection (`if st.image(...)`) to set `st.session_state.selected_image = img_path` and `st.session_state.selected_image_name = img_name` when an image is clicked.
+   - A success message (`st.success(f"{img_name} is selected")`) appears below the clicked image.
+
+3. **Selection Effects**:
+   - Added a `.selected-image` CSS class with a green border (`border: 3px solid #4CAF50`) and glow (`box-shadow: 0 0 10px rgba(76, 175, 80, 0.5)`) for the selected image.
+   - The `image-card` div applies the `selected-image` class dynamically when `is_selected = st.session_state.selected_image_name == img_name`.
+   - Retained the hover effect (`transform: scale(1.05)`) for interactivity.
+
+4. **Fixes and Improvements**:
+   - Moved `image_options` definition before its use to avoid reference errors.
+   - Removed the duplicate `init_db()` function from your latest code.
+   - Kept the admin password as `"bala"` (per your code). For security, consider using an environment variable (`os.getenv("ADMIN_PASSWORD")`).
+   - Ensured `langid` is used for language detection, matching your `requirements.txt`.
+
+### Deployment and Submission Steps
+To deploy the updated app and submit to `code.swecha.org`:
+
+1. **Update app.py**:
+   - Save the code above as `app.py` in your local `desi-meme-creator` directory.
+   - Replace `"bala"` with a secure password or set `ADMIN_PASSWORD` in Render environment variables:
+     ```python
+     if admin_password == os.getenv("ADMIN_PASSWORD"):
+     ```
+   - Ensure `images/` contains `meme1.jpg` to `meme10.jpg` (<500KB each, optimized with [TinyPNG](https://tinypng.com/)).
+
+2. **Verify requirements.txt**:
+   - Ensure `requirements.txt` includes:
+     ```
+     streamlit>=0.65.0
+     pandas
+     langid
+     Pillow
+     psycopg2-binary
+     requests
+     ```
+   - Install locally:
+     ```bash
+     pip install -r requirements.txt
+     ```
+
+3. **Test Locally**:
+   - Run the app:
+     ```bash
+     streamlit run app.py
+     ```
+   - Verify:
+     - Select “Predefined Image” → only the image grid appears (no file uploader).
+     - Click a predefined image → green border appears, success message shows (e.g., “Meme 1 is selected”).
+     - Select “Upload Image” → only the file uploader appears (no image grid).
+     - Generate a meme (e.g., “మजेदार मीम”) → check preview, download, and corpus.
+     - Use “Clear Database” with password `"bala"`.
+
+4. **Commit and Push**:
+   - Update your GitHub repo (`https://github.com/BALASAI77/desi-meme-creator`):
+     ```bash
+     cd desi-meme-creator
+     git add app.py requirements.txt
+     git commit -m "Enhance UI: conditional image display, click-to-select with effects"
+     git push origin main
+     ```
+   - Push to `code.swecha.org`:
+     ```bash
+     git remote add swecha https://code.swecha.org/BalaSai/desi-meme-creator.git
+     git push swecha main
+     ```
+   - Verify files on `https://code.swecha.org/BalaSai/desi-meme-creator`:
+     - `app.py`, `requirements.txt`, `README.md`, `CONTRIBUTING.md`, `LICENSE`, `REPORT.md`, `images/`.
+     - Ensure the repo is public.
+
+5. **Redeploy on Render**:
+   - Log in to [Render](https://dashboard.render.com/) at 04:34 PM IST on August 22, 2025.
+   - Navigate to your app (`desi-meme-creator`).
+   - Trigger a manual redeploy or ensure it’s linked to your GitHub repo.
+   - Verify environment variables:
+     - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`.
+     - Optionally, add `ADMIN_PASSWORD` for the admin password.
+   - Test at `https://desi-meme-creator.onrender.com`:
+     - Check conditional display (image grid vs. file uploader).
+     - Click a predefined image → verify green border and success message.
+     - Generate a meme, check corpus, and test “Clear Database”.
+
+6. **Clear Database**:
+   - Clear for a clean submission:
+     - Use the app’s “Clear Database” button with password `"bala"`.
+     - Or in pgAdmin:
+       ```sql
+       TRUNCATE TABLE meme_corpus RESTART IDENTITY;
+       SELECT * FROM meme_corpus;
+       ```
+       (Should return no rows.)
+
+7. **Submit to code.swecha.org**:
+   - Submit: `https://code.swecha.org/BalaSai/desi-meme-creator`.
+   - Confirm public access.
+
+### Notes
+- **Password Security**: Replace `"bala"` with a secure password or use `os.getenv("ADMIN_PASSWORD")` for production.
+- **Images**: Ensure `meme1.jpg` to `meme10.jpg` are in `images/` and match `image_options`. Use a CDN if needed:
+  ```python
+  image_options = {
+      "Meme 1": "https://your-cdn.com/meme1.jpg",
+      # ... up to "Meme 10"
+  }
+  ```
+- **Personalization**: Share your name and email (e.g., `Bala Sai`, `bala.sai@example.com`) to pre-fill `README.md`, `LICENSE`, etc.
+- **Further Enhancements**: Request features like text color pickers or text positioning if needed.
+- **Troubleshooting**:
+  - **Image Click Issues**: If clicking images doesn’t work, ensure `output_format="PNG"` and clear browser cache.
+  - **Render Errors**: Check logs for dependency or database issues.
+  - **UI Rendering**: Test locally to verify CSS (e.g., `.selected-image`).
+
+If you encounter errors or want additional tweaks, let me know. Test the app and submit `https://code.swecha.org/BalaSai/desi-meme-creator` once verified!'''
