@@ -9,104 +9,6 @@ import psycopg2
 from psycopg2 import pool
 import streamlit as st_version_check
 
-# Custom CSS for enhanced UI
-st.markdown("""
-    <style>
-        .stApp {
-            background-color: #f0f2f6;
-            font-family: 'Arial', sans-serif;
-        }
-        .sidebar .sidebar-content {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .stButton > button {
-            width: 100%;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: bold;
-            transition: background-color 0.2s;
-        }
-        .stButton > button:hover {
-            background-color: #45a049;
-        }
-        .stTextInput > div > div > input {
-            border-radius: 8px;
-            border: 1px solid #ddd;
-            padding: 12px;
-            font-size: 16px;
-        }
-        .stSlider > div > div > div {
-            background-color: #ddd;
-        }
-        .stSuccess {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-            border-radius: 8px;
-            padding: 12px;
-            font-size: 16px;
-        }
-        .stError {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-            border-radius: 8px;
-            padding: 12px;
-            font-size: 16px;
-        }
-        .image-grid {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-            justify-content: center;
-        }
-        .image-card {
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            padding: 10px;
-            text-align: center;
-            width: 180px;
-            transition: transform 0.2s;
-        }
-        .image-card:hover {
-            transform: scale(1.05);
-            cursor: pointer;
-        }
-        .image-card img {
-            border-radius: 5px;
-            width: 100%;
-        }
-        .selected-image {
-            border: 3px solid #4CAF50;
-            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
-        }
-        .stDataFrame {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            overflow: hidden;
-            background-color: white;
-        }
-        h1, h2, h3 {
-            color: #333;
-        }
-        .stSpinner > div {
-            border-color: #4CAF50 transparent transparent transparent;
-        }
-        .stExpander {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background-color: white;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 # Check Streamlit version
 try:
     st_version = st_version_check.__version__
@@ -118,11 +20,14 @@ except AttributeError:
     st.stop()
 
 # Set page configuration
-st.set_page_config(page_title="Desi Meme Creator", page_icon="😂", layout="wide")
+st.set_page_config(page_title="Desi Meme Creator", page_icon="😂")
 
-# App title
+# App title and subheader
 st.title("Desi Meme Creator")
-st.markdown("Create personalized memes with Indian language support and build your own corpus!", unsafe_allow_html=True)
+try:
+    st.subheader("Select a predefined image or upload your own, then enter text to create a meme. The text's language will be detected and stored in a database.")
+except AttributeError:
+    st.markdown("## Select a predefined image or upload your own, then enter text to create a meme. The text's language will be detected and stored in a database.")
 
 # Language code to name mapping
 language_map = {
@@ -150,7 +55,7 @@ font_map = {
     'Unknown': 'NotoSans-Regular.ttf'
 }
 
-# Font URLs
+# Download fonts
 font_urls = {
     'NotoSansDevanagari-Regular.ttf': 'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf',
     'NotoSansTamil-Regular.ttf': 'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSansTamil/NotoSansTamil-Regular.ttf',
@@ -166,12 +71,10 @@ font_urls = {
     'NotoSans-Regular.ttf': 'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf'
 }
 
-# Download fonts
 for font_file, url in font_urls.items():
     if not os.path.exists(font_file):
         try:
             response = requests.get(url)
-            response.raise_for_status()
             with open(font_file, "wb") as f:
                 f.write(response.content)
         except Exception as e:
@@ -215,19 +118,6 @@ def init_db():
 
 init_db()
 
-# Function to clear database
-def clear_db():
-    try:
-        conn = db_pool.getconn()
-        cursor = conn.cursor()
-        cursor.execute("TRUNCATE TABLE meme_corpus RESTART IDENTITY")
-        conn.commit()
-        cursor.close()
-        db_pool.putconn(conn)
-        st.success("Database cleared successfully!")
-    except Exception as e:
-        st.error(f"Error clearing database: {str(e)}")
-
 # Function to add text with outline
 def draw_text_with_outline(draw, text, x, y, font, fill_color="white", outline_color="black"):
     try:
@@ -243,7 +133,11 @@ def draw_text_with_outline(draw, text, x, y, font, fill_color="white", outline_c
 # Function to create meme
 def create_meme(image_input, text, font_size, language_name):
     try:
-        img = Image.open(image_input) if isinstance(image_input, str) else Image.open(image_input)
+        # Handle both file path (predefined) and file object (uploaded)
+        if isinstance(image_input, str):
+            img = Image.open(image_input)
+        else:
+            img = Image.open(image_input)
         if img.mode == 'RGBA':
             img = img.convert('RGB')
         draw = ImageDraw.Draw(img)
@@ -276,9 +170,10 @@ def detect_language(text):
         if len(text.strip()) < 5:
             return "English"
         lang_code, confidence = langid.classify(text)
+        # Only accept detection if confidence is positive or text is clearly in a supported script
         if confidence > 0 or lang_code in language_map:
             return language_map.get(lang_code, "Unknown")
-        return "English"
+        return "English"  # Fallback for low-confidence detections
     except Exception as e:
         st.error(f"Error detecting language: {str(e)}")
         return "Unknown"
@@ -313,13 +208,16 @@ def get_corpus():
         st.error(f"Error retrieving corpus: {str(e)}")
         return pd.DataFrame()
 
-# Initialize session state
+# Initialize session state for selected image and image name
 if 'selected_image' not in st.session_state:
     st.session_state.selected_image = None
 if 'selected_image_name' not in st.session_state:
     st.session_state.selected_image_name = None
 
-# Predefined images
+# Image input selection
+image_input_option = st.radio("Choose Image Input", ("Select Predefined Image", "Upload Custom Image"))
+
+# Predefined images for selection
 image_options = {
     "Meme 1": "images/meme1.jpg",
     "Meme 2": "images/meme2.jpg",
@@ -333,106 +231,101 @@ image_options = {
     "Meme 10": "images/meme10.jpg"
 }
 
-# Sidebar for inputs
-with st.sidebar:
-    st.header("Create Your Meme")
-    st.markdown("---")
-    
-    # Image input selection
-    with st.expander("Choose Image Input", expanded=True):
-        image_input_option = st.radio("Select Input Method", ("Predefined Image", "Upload Image"), help="Choose a predefined meme or upload your own.")
+if image_input_option == "Select Predefined Image":
+    st.subheader("Select a Meme Image")
+    # First row
+    cols1 = st.columns(5)  # 5 columns for first row
+    for idx, (img_name, img_path) in enumerate(list(image_options.items())[:5]):
+        try:
+            with cols1[idx]:
+                img = Image.open(img_path)
+                st.image(img, caption=img_name, use_container_width=True)
+                if st.button(f"Select {img_name}", key=f"select_{img_name}"):
+                    st.session_state.selected_image = img_path
+                    st.session_state.selected_image_name = img_name
+        except Exception as e:
+            st.warning(f"Error loading image {img_name}: {str(e)}")
 
-    # Show only the relevant image input section
-    if image_input_option == "Predefined Image":
-        with st.expander("Select a Meme Image", expanded=True):
-            st.markdown('<div class="image-grid">', unsafe_allow_html=True)
-            cols = st.columns(2)
-            for idx, (img_name, img_path) in enumerate(image_options.items()):
-                with cols[idx % 2]:
-                    try:
-                        img = Image.open(img_path)
-                        is_selected = st.session_state.selected_image_name == img_name
-                        st.markdown(f'<div class="image-card {"selected-image" if is_selected else ""}">', unsafe_allow_html=True)
-                        if st.image(img, caption=img_name, use_container_width=True, output_format="PNG"):
-                            st.session_state.selected_image = img_path
-                            st.session_state.selected_image_name = img_name
-                            st.success(f"{img_name} is selected")
-                        st.markdown('</div>', unsafe_allow_html=True)
-                    except Exception as e:
-                        st.warning(f"Error loading image {img_name}: {str(e)}")
-            st.markdown('</div>', unsafe_allow_html=True)
+    # Second row
+    cols2 = st.columns(5)  # 5 columns for second row
+    for idx, (img_name, img_path) in enumerate(list(image_options.items())[5:]):
+        try:
+            with cols2[idx]:
+                img = Image.open(img_path)
+                st.image(img, caption=img_name, use_container_width=True)
+                if st.button(f"Select {img_name}", key=f"select_{img_name}"):
+                    st.session_state.selected_image = img_path
+                    st.session_state.selected_image_name = img_name
+        except Exception as e:
+            st.warning(f"Error loading image {img_name}: {str(e)}")
+
+    # Display confirmation message if a predefined image is selected
+    if st.session_state.selected_image_name:
+        st.success(f"{st.session_state.selected_image_name} is selected")
+else:
+    st.subheader("Upload Your Image")
+    uploaded_image = st.file_uploader("Upload a meme image (JPG/PNG)", type=["jpg", "jpeg", "png"])
+    if uploaded_image:
+        st.session_state.selected_image = uploaded_image
+        st.session_state.selected_image_name = None  # Reset for uploaded images
+
+# Text input
+meme_text = st.text_input("Meme Caption (in any Indian language or English)", placeholder="e.g., मजेदार मीम, நகைச்சுவை")
+
+# Font size slider
+font_size = st.slider("Font Size", 20, 100, 50)
+
+# Generate meme button
+if st.button("Generate Meme"):
+    if st.session_state.selected_image is not None and meme_text:
+        with st.spinner("Creating meme and detecting language..."):
+            language_name = detect_language(meme_text)
+            meme_image = create_meme(st.session_state.selected_image, meme_text, font_size, language_name)
+            if meme_image:
+                try:
+                    st.subheader("Generated Meme")
+                except AttributeError:
+                    st.markdown("## Generated Meme")
+                st.image(meme_image, caption="Your Meme", use_container_width=True)
+                
+                st.download_button(
+                    label="Download Meme",
+                    data=meme_image,
+                    file_name="meme.png",
+                    mime="image/png"
+                )
+            
+            try:
+                st.subheader("Detected Language")
+            except AttributeError:
+                st.markdown("## Detected Language")
+            st.write(language_name)
+
+            save_to_db(language_name, meme_text)
     else:
-        with st.expander("Upload Your Image", expanded=True):
-            uploaded_image = st.file_uploader("Upload a meme image (JPG/PNG)", type=["jpg", "jpeg", "png"], help="Upload a JPG or PNG image for your meme.")
-            if uploaded_image:
-                st.session_state.selected_image = uploaded_image
-                st.session_state.selected_image_name = None
-                st.success("Image uploaded successfully!")
+        st.error("Please select or upload an image and enter a caption to generate a meme.")
 
-    # Text input and font size
-    with st.expander("Customize Caption", expanded=True):
-        meme_text = st.text_input("Meme Caption", placeholder="e.g., मजेदार मीम, நகைச்சுவை", help="Enter a caption in any Indian language or English.")
-        font_size = st.slider("Font Size", 20, 100, 50, help="Adjust the size of the caption text.")
-
-    # Generate meme button
-    if st.button("Generate Meme", use_container_width=True):
-        if st.session_state.selected_image is not None and meme_text:
-            with st.spinner("Creating meme and detecting language..."):
-                language_name = detect_language(meme_text)
-                meme_image = create_meme(st.session_state.selected_image, meme_text, font_size, language_name)
-                if meme_image:
-                    st.session_state.meme_image = meme_image
-                    st.session_state.language_name = language_name
-                    save_to_db(language_name, meme_text)
-        else:
-            st.error("Please select or upload an image and enter a caption.")
-
-    # Admin controls
-    with st.expander("Admin Controls", expanded=False):
-        admin_password = st.text_input("Admin Password", type="password", help="Enter password to clear database.")
-        if st.button("Clear Database", use_container_width=True):
-            if admin_password == "bala":  # Replace with a secure password
-                clear_db()
-            else:
-                st.error("Incorrect password. Database not cleared.")
-
-# Main content area
-st.markdown("---")
-col1, col2 = st.columns([2, 1])
-
-with col1:
-    st.header("Meme Preview")
-    if 'meme_image' in st.session_state and st.session_state.meme_image:
-        st.image(st.session_state.meme_image, caption="Your Meme", use_container_width=True)
-        st.download_button(
-            label="Download Meme",
-            data=st.session_state.meme_image,
-            file_name="meme.png",
-            mime="image/png",
-            use_container_width=True
-        )
-        if 'language_name' in st.session_state:
-            st.subheader("Detected Language")
-            st.write(st.session_state.language_name)
-    else:
-        st.info("Generate a meme to see the preview.")
-
-with col2:
-    st.header("Meme Corpus")
-    df = get_corpus()
-    if not df.empty:
-        st.dataframe(df, use_container_width=True)
-    else:
-        st.info("Corpus is empty.")
+# Display corpus
+df = get_corpus()
+if not df.empty:
+    try:
+        st.subheader("Current Corpus")
+    except AttributeError:
+        st.markdown("## Current Corpus")
+    st.dataframe(df)
+else:            
+    st.write("Corpus is empty.")
 
 # Example inputs
-st.markdown("---")
-with st.expander("Example Inputs", expanded=False):
-    st.markdown("""
-    - hiii (English)
-    - मजेदार मीम (Hindi: Funny meme)
-    - நகைச்சுவை (Tamil: Humor)
-    - ମଜାରେ ମ୶ (Odia: Funny meme)
-    - হাসিখুশি (Bengali: Happy)
-    - తమాషా మీమ్ (Telugu: Funny meme)
-    """)
+try:
+    st.subheader("Example Inputs")
+except AttributeError:
+    st.markdown("## Example Inputs")
+st.write("""
+- hiii (English)
+- मजेदार मीम (Hindi: Funny meme)
+- நகைச்சுவை (Tamil: Humor)
+- ମଜାରେ ମ୶ (Odia: Funny meme)
+- হাসিখুশি (Bengali: Happy)
+- తమాషా మీమ్ (Telugu: Funny meme)
+""")
