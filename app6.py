@@ -386,7 +386,7 @@ with st.sidebar:
     with st.expander("Admin Controls", expanded=False):
         admin_password = st.text_input("Admin Password", type="password", help="Enter password to clear database.")
         if st.button("Clear Database", use_container_width=True):
-            if admin_password == "your-secret-password":  # Replace with your actual password
+            if admin_password == "bala":  # Replace with your actual password
                 clear_db()
             else:
                 st.error("Incorrect password. Database not cleared.")
