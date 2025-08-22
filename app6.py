@@ -1,4 +1,3 @@
-
 import os
 import streamlit as st
 import pandas as pd
@@ -78,10 +77,15 @@ st.markdown("""
         }
         .image-card:hover {
             transform: scale(1.05);
+            cursor: pointer;
         }
         .image-card img {
             border-radius: 5px;
-            cursor: pointer;
+            width: 100%;
+        }
+        .selected-image {
+            border: 3px solid #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
         }
         .stDataFrame {
             border: 1px solid #ddd;
@@ -212,6 +216,28 @@ def init_db():
 init_db()
 
 # Function to clear database
+def init_db():
+    try:
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS meme_corpus (
+                id SERIAL PRIMARY KEY,
+                language VARCHAR(50),
+                text TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        cursor.close()
+        db_pool.putconn(conn)
+    except Exception as e:
+        st.error(f"Error initializing database: {str(e)}")
+        st.stop()
+
+init_db()
+
+# Function to clear database
 def clear_db():
     try:
         conn = db_pool.getconn()
@@ -320,24 +346,11 @@ with st.sidebar:
     st.header("Create Your Meme")
     st.markdown("---")
     
-    # Image input selection with expander
+    # Image input selection
     with st.expander("Choose Image Input", expanded=True):
         image_input_option = st.radio("Select Input Method", ("Predefined Image", "Upload Image"), help="Choose a predefined meme or upload your own.")
 
-    # Predefined images
-    image_options = {
-        "Meme 1": "images/meme1.jpg",
-        "Meme 2": "images/meme2.jpg",
-        "Meme 3": "images/meme3.jpg",
-        "Meme 4": "images/meme4.jpg",
-        "Meme 5": "images/meme5.jpg",
-        "Meme 6": "images/meme6.jpg",
-        "Meme 7": "images/meme7.jpg",
-        "Meme 8": "images/meme8.jpg",
-        "Meme 9": "images/meme9.jpg",
-        "Meme 10": "images/meme10.jpg"
-    }
-
+    # Show only the relevant image input section
     if image_input_option == "Predefined Image":
         with st.expander("Select a Meme Image", expanded=True):
             st.markdown('<div class="image-grid">', unsafe_allow_html=True)
@@ -346,9 +359,9 @@ with st.sidebar:
                 with cols[idx % 2]:
                     try:
                         img = Image.open(img_path)
-                        st.markdown(f'<div class="image-card">', unsafe_allow_html=True)
-                        st.image(img, caption=img_name, use_container_width=True)
-                        if st.button(f"Select {img_name}", key=f"select_{img_name}"):
+                        is_selected = st.session_state.selected_image_name == img_name
+                        st.markdown(f'<div class="image-card {"selected-image" if is_selected else ""}">', unsafe_allow_html=True)
+                        if st.image(img, caption=img_name, use_container_width=True, output_format="PNG"):
                             st.session_state.selected_image = img_path
                             st.session_state.selected_image_name = img_name
                             st.success(f"{img_name} is selected")
@@ -431,122 +444,3 @@ with st.expander("Example Inputs", expanded=False):
     - হাসিখুশি (Bengali: Happy)
     - తమాషా మీమ్ (Telugu: Funny meme)
     """)
-
-'''
-### Fixes for the Syntax Error
-The error occurred because the file (`app6.py` or `app.py`) included Markdown code block markers (```python ... ```). The corrected code above:
-- Removes all Markdown markers, ensuring it’s pure Python.
-- Maintains the enhanced UI with expanders, a responsive image grid, and polished styling.
-- Includes a password-protected “Clear Database” button (replace `your-secret-password` with a secure value).
-
-### UI Enhancements
-1. **Expanders for Organization**:
-   - Image selection, upload, caption customization, and admin controls are grouped in `st.expander` sections for a cleaner sidebar.
-   - Expanders are collapsible to reduce clutter, with the image and caption sections open by default.
-2. **Image Selection**:
-   - Predefined images are displayed in a 2-column grid with card styling (shadows, rounded corners, hover scaling).
-   - Each image has a dedicated “Select” button with immediate success feedback.
-   - Images scale on hover (`transform: scale(1.05)`) for interactivity.
-3. **Input Components**:
-   - Text input and font size slider are styled with rounded borders and larger fonts.
-   - Help text (`help` parameter) guides users on each input.
-   - Buttons use full width (`use_container_width=True`) for consistency.
-4. **Main Layout**:
-   - Two-column layout: left for meme preview/download, right for corpus.
-   - Preview updates dynamically after generating a meme, stored in `st.session_state`.
-   - Corpus table is styled with borders and rounded corners.
-5. **Feedback and Styling**:
-   - Success/error messages have colored backgrounds and borders.
-   - Spinners use a custom color (`#4CAF50`) for consistency.
-   - Example inputs are in a collapsible expander to save space.
-
-### Deployment and Submission Steps
-To resolve the error and deploy the updated app with the enhanced UI:
-
-1. **Update app.py**:
-   - Save the code above as `app.py` (not `app6.py`) in your local `desi-meme-creator` directory.
-   - Replace `your-secret-password` with a secure password (store it safely, not in the code).
-   - Ensure `images/` contains `meme1.jpg` to `meme10.jpg` (<500KB each, optimized with [TinyPNG](https://tinypng.com/)).
-
-2. **Verify requirements.txt**:
-   - Ensure `requirements.txt` matches:
-     ```
-     streamlit>=0.65.0
-     pandas
-     langid
-     Pillow
-     psycopg2-binary
-     requests
-     ```
-   - If you previously used `langdetect`, update to `langid` by installing:
-     ```bash
-     pip install langid
-     ```
-
-3. **Commit and Push to Repositories**:
-   - Update your GitHub repo (`https://github.com/BALASAI77/desi-meme-creator`):
-     ```bash
-     cd desi-meme-creator
-     git add app.py requirements.txt
-     git commit -m "Fix syntax error and enhance UI for Render and code.swecha.org"
-     git push origin main
-     ```
-   - Push to `code.swecha.org`:
-     ```bash
-     git remote add swecha https://code.swecha.org/BalaSai/desi-meme-creator.git
-     git push swecha main
-     ```
-   - Verify files on `https://code.swecha.org/BalaSai/desi-meme-creator`:
-     - `app.py`, `requirements.txt`, `README.md`, `CONTRIBUTING.md`, `LICENSE`, `REPORT.md`, `images/`.
-     - Ensure the repository is public and `README.md` renders correctly.
-
-4. **Redeploy on Render**:
-   - Log in to [Render](https://dashboard.render.com/).
-   - Navigate to your app (`desi-meme-creator`).
-   - Trigger a manual redeploy or ensure it’s linked to your GitHub repo (`https://github.com/BALASAI77/desi-meme-creator`) for automatic deploys.
-   - Verify environment variables:
-     - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`.
-   - Test at `https://desi-meme-creator.onrender.com`:
-     - Select a predefined image (check “Meme X is selected”).
-     - Upload a custom JPG/PNG.
-     - Generate a meme (e.g., “మजेदार मीम”).
-     - Verify corpus updates and “Clear Database” (use your password).
-     - Check UI elements (expanders, image grid, styling).
-
-5. **Clear Database**:
-   - For a clean submission, clear the database:
-     - Use the “Clear Database” button in the app with your password.
-     - Or in pgAdmin:
-       ```sql
-       TRUNCATE TABLE meme_corpus RESTART IDENTITY;
-       ```
-     - Verify:
-       ```sql
-       SELECT * FROM meme_corpus;
-       ```
-       (Should return no rows.)
-
-6. **Submit to code.swecha.org**:
-   - Submit the repository URL: `https://code.swecha.org/BalaSai/desi-meme-creator`.
-   - Confirm it’s publicly accessible.
-
-### Notes
-- **Personalization**: Replace `[Your Name]` and `[your-email@example.com]` in `README.md`, `CONTRIBUTING.md`, `LICENSE`, and `REPORT.md` (from previous responses) with your details (e.g., `Bala Sai`, `bala.sai@example.com`). Share these if you want pre-filled files.
-- **Password Security**: Replace `your-secret-password` with a secure value. Avoid hardcoding; consider setting it as an environment variable on Render (`ADMIN_PASSWORD`).
-- **Image Optimization**: Ensure `meme1.jpg` to `meme10.jpg` are <500KB. Use a CDN if size is an issue:
-  ```python
-  image_options = {
-      "Meme 1": "https://your-cdn.com/meme1.jpg",
-      # ... up to "Meme 10"
-  }
-  ```
-- **Further UI Enhancements**: If you want features like text color selection, text positioning, or image filters, let me know.
-- **Dependencies**: The code uses `langid` (per your latest code). Ensure it’s installed on Render.
-
-### Troubleshooting
-- **Syntax Error Persists**: Verify `app.py` contains only the Python code above (no ```python markers). Check file encoding (UTF-8) and line endings (Unix-style, `\n`).
-- **Render Errors**: Check Render logs for issues (e.g., missing dependencies, database connection). Ensure `requirements.txt` is correct.
-- **Image Issues**: Confirm `images/` is in the repository and filenames match `image_options`. Use `git lfs` for large images.
-- **UI Rendering**: Test locally (`streamlit run app.py`) to verify styling. Ensure browser cache is cleared for Render.
-
-If you provide your name/email or encounter specific errors (e.g., Render logs), I can refine the files or troubleshoot further. Test the app and submit `https://code.swecha.org/BalaSai/desi-meme-creator` once verified!'''
